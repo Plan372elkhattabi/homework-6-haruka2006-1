@@ -1,8 +1,85 @@
 ---
 title: PLAN 372
-author: Your Name
+author: Haruka Kushima
 ---
 
 Place your analysis code in this file; you must not rename it, though you may delete these instructions. Please update the block above with the name of the assignment and with your name.When you push your code to github, it will automatically be rendered for grading. You can see whether the automatic rendering worked in the "Actions" tab of the github repository.
 
 If you use any libraries other than `tidyverse`, `lubridate`, `sf`, `ggplot2`, `here`, `terra`, `ggspatial`, `rJavaEnv`, and `r5r`, add them to the list in the DESCRIPTION file.
+
+## Set up
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+
+tree<-read.csv("TS3_Raw_tree_data.csv")
+```
+
+## Question 1
+```{r}
+all(str_detect(tree$City, "([^,]+)*,*[:whitespace:]*([:upper:]+)")) #Check "City" column structure
+
+tree[,c("City", "State")] = str_match(tree$City, "([^,]+)*,*[:whitespace:]*([:upper:]+)")[,2:3] #Separate city (anything that isn't a comma) and state (uppercase letters), and put the 2 data in their respective columns
+
+treeStateFreq<-tree%>%
+  group_by(State)%>% #Group the observations by state
+  tally() #Count how many observations there are per state
+
+  
+ggplot(data=treeStateFreq, aes(x=State, y=n))+
+  ylab("Observations")+
+  geom_bar(stat = "identity")
+```
+
+
+## Question 2
+
+They took data from Charlotte (828 observations) and Charleston (872 observations).
+```{r}
+treeCar<-tree%>%
+  filter(State=="NC"|State=="SC") #Filter out data that isn't from NC or SC
+
+treeCityCar<-treeCar%>%
+  group_by(City)%>% #Group the observations by city
+  tally() #Count how many observations there are per city
+```
+
+
+## Question 3 & 4
+
+```{r}
+all(str_detect(treeCar$ScientificName, "^([:alpha:]+)[:whitespace:]([:alpha:]+)")) #Check "ScientificName" column structure
+
+treeCar[,c("genus", "species")] = str_match(treeCar$ScientificName, "^([:alpha:]+)[:whitespace:]([:alpha:]+)")[,2:3] #Separate city and state, and put the 2 data in their respective columns
+
+
+genAvg<-treeCar%>%
+  group_by(genus)%>% #group by the genus column
+  arrange(genus)%>% #sort data by genus
+  mutate(avgC=mean(AvgCdia..m.), avgA=mean(Age), rowNum=row_number())%>% #add the average crown column and row number
+  filter(rowNum==1)%>% #only put data from the first row of each genus to avoid repetition
+  select(genus, avgC, avgA) #Get rid of columns besides the genus, the average crown size, and the average age
+
+#Bar graph for Question 3
+ggplot(data=genAvg, aes(x=genus, y=avgC))+
+  ylab("Average Crown Size")+
+  geom_bar(stat = "identity")
+
+#Scatter plot for Question 4
+ggplot()+
+  geom_point(data=genAvg, aes(avgA, avgC))+
+  xlab("Average Age")+
+  ylab("Average Crown Size")
+  
+
+a<-lm(genAvg$avgC~genAvg$avgA) #Regress the crown size using age
+summary(a) # Look at R2. It's 0.1208
+```
+
+## Extra credit
+
+```{r}
+genAvg<-genAvg%>%
+  mutate(efficiency=avgC/avgA) #Calculate efficiency by dividing the average crown size by the average age.
+```
